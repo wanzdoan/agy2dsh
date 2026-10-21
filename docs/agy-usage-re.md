@@ -98,11 +98,11 @@ prints are not reconstructible from any cloud quota call reachable with the user
 ## Re-verifying
 
 ```bash
-node verify-cli-quota.mjs        # CLI snapshot vs raw payload, prints the pill
-node grpcprobe.mjs cloudcode-pa.googleapis.com PredictionService RetrieveUserQuotaSummary
-node grpcprobe.mjs daily-cloudcode-pa.googleapis.com PredictionService RetrieveUserQuotaSummary
+node test/cli-quota.mjs        # CLI snapshot vs raw payload, prints the pill
+node tools/grpcprobe.mjs cloudcode-pa.googleapis.com PredictionService RetrieveUserQuotaSummary
+node tools/grpcprobe.mjs daily-cloudcode-pa.googleapis.com PredictionService RetrieveUserQuotaSummary
 ```
 
-`grpcprobe.mjs` takes `[host] [Service] [Method] [protoHexBody]` and decodes the protobuf reply
-generically; `scanservices.mjs` enumerates every embedded service and gRPC path;
-`scanstrings.mjs` greps printable strings in the binary.
+`tools/grpcprobe.mjs` takes `[host] [Service] [Method] [protoHexBody]` and decodes the protobuf reply
+generically; `tools/scanservices.mjs` enumerates every embedded service and gRPC path;
+`tools/scanstrings.mjs` greps printable strings in the binary.

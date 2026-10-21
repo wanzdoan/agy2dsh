@@ -15,7 +15,9 @@
     "lib/",
     "cordis.patch.yml",
     "README.md",
-    "LICENSE"
+    "CHANGELOG.md",
+    "LICENSE",
+    "docs/"
   ],
   "keywords": [
     "dsh",
@@ -37,8 +39,8 @@
     "url": "https://github.com/wanzdoan/agy2dsh/issues"
   },
   "scripts": {
-    "test": "eslint lib/ test/ && node --import ./test/_setup.mjs --test test/*.test.mjs",
-    "typecheck": "tsc -p tsconfig.checkjs.json"
+    "test": "node test/imports.mjs && node test/config-volatility.mjs && node test/quota-summary.mjs",
+    "test:live": "node test/cli-quota.mjs"
   },
   "dsh": {
     "bundle": {
