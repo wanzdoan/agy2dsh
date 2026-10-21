@@ -63,9 +63,21 @@ indefinitely without running `agy`.
 | `composerQuota` | `off` | `off` / `percent` / `bar` |
 | `notifyLimits` | `true` | Alert when a quota window passes 90% |
 
-Antigravity's `retrieveUserQuota` is metered per model family, so the plugin reports **two**
-windows — `gemini` and `claude` — each with its own reset time. A single percentage cannot
+Antigravity's quota is metered per model family and per window, so the plugin reads
+`:retrieveUserQuotaSummary` and reports **four** numbers — `Gemini [weekly|5h]` and
+`Claude [weekly|5h]` — each with its own reset time. A single blended percentage cannot
 describe the account.
+
+## Importing accounts
+
+*Import from CLI* reads the live credential record the vendor CLI keeps (antigravity: Windows
+Credential Manager target `gemini:antigravity`). *Import all from CLI* additionally scans the
+per-account copies under `~/.gemini/account-vault/sessions`, deduplicates them by refresh token
+and gives every distinct account its own slot.
+
+If a session dies anyway, the plugin re-reads that CLI store on `invalid_grant` and adopts a
+newer refresh token before giving up — the CLI rewrites its record when it refreshes, which
+invalidates the copy made at import time.
 
 ## Development
 
