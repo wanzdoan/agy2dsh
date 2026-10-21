@@ -1,3 +1,20 @@
+## [0.7.1] - 2026-10-21
+
+### Fixed
+- **Opening the hub rearranged the chat.** The overlay was a `position: fixed` box rendered inside the session-header slot, so it inherited the header's stacking context and re-flowed the conversation around it. It is now a native `<dialog>` with `showModal()`, which lives in the browser's top layer: no re-parenting, no inherited clipping, and the chat layout is untouched while it is open.
+- **The panel rendered as unstyled text after upgrading.** The stylesheet was guarded by a fixed tag id, so a stylesheet left in the DOM by the previous bundle suppressed the new one and every element lost its rules. Injection now uses a versioned id, removes stale tags from this plugin, and the structural containers also carry inline styles, so a blocked or rewritten stylesheet no longer degrades the panel to plain words.
+- **Quota showed Claude only.** Antigravity meters **two families, each with a weekly and a 5-hour window** — `:retrieveUserQuota` only lists per-model buckets, so any grouping of it is a guess. The plugin now reads `:retrieveUserQuotaSummary`, which reports `groups[] -> buckets[]` with an explicit `window`, and renders `Gemini [weekly|5h] · Claude [weekly|5h]`. Verified live against a real account: `gemini-weekly 0%`, `gemini-5h 0%`, `claude-weekly 99.74%`, `claude-5h 0%`, each with its own reset time.
+- **`client_secret is missing` / dead sessions after the CLI refreshed.** The CLI overwrites its own credential record when it refreshes, which invalidates the refresh token the plugin copied at import time. `refresh()` now accepts a `resync` hook: on `invalid_grant`, `token_revoked` or a missing-secret rejection it re-reads the CLI store, adopts a newer refresh token and retries once, then explains the failure in plain words instead of surfacing a raw vendor 400.
+
+### Added
+- **Import every account the CLI left behind.** New `POST /dsh-subscriptions/import-local-all` (`loadAllAntigravityBlobs()`) scans the Windows Credential Manager record plus the per-account copies under `~/.gemini/account-vault/sessions`, deduplicates by refresh token and imports each distinct account into its own slot. The settings panel exposes it as *Import all from CLI* and reports how many accounts landed.
+
+### Verification
+- `verify-quota-summary.mjs` (new): 17/17 — four windows derived from a real summary payload, correct order, distinct reset times, per-family severity, legacy payload still degrades to families.
+- `verify-render.mjs` (new): 26/26 — every registered slot component rendered against a miniature React runtime; catches the "bare text" class of failure.
+- `verify-live-quota.mjs`: live refresh + quota → `Gemini [0|0] · Claude [100|0]`.
+- `verify-client.mjs` 14/14, `verify-subscriptions.mjs` 17/17, `verify-host.mjs`, `verify-images.mjs`, `verify-prune.mjs` 72/72.
+
 ## [0.7.0] - 2026-10-21
 
 A remake rather than a patch: the plugin now supports the two subscriptions that actually matter here and drops everything else.
