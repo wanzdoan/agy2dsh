@@ -1,3 +1,23 @@
+## [0.8.3] - 2026-10-21
+
+### Fixed
+- **The terminal window that flashed on screen is gone.** Reading the Antigravity credential record
+  spawns `powershell.exe` to call `CredReadW`; that call was made without `windowsHide`, so the host -
+  a GUI process with no console - made Windows allocate a console window for the child. A black box
+  appeared for as long as it ran, measured at **~305 ms** per call (the `Add-Type` compile dominates),
+  every five minutes from the background email check and once per "From CLI" import in the Hub. It
+  now passes `windowsHide: true`, like every other spawn in the plugin already did.
+- The credential read is memoised for ten seconds, so several callers in one cycle share a single
+  PowerShell spawn (~300 ms of blocked event loop, each time). Explicit user actions bypass the memo:
+  `/discover-local`, `/import-local` and `/import` pass `{ fresh: true }`.
+- `defaultExec` in `lib/agy-usage.js` now forces `windowsHide: true` on the `agy` probe itself instead
+  of trusting its caller's options object, so no future call site can reintroduce a window.
+
+### Added
+- `test/no-window-flash.mjs` walks every `exec`/`execFile`/`spawn` call site in `lib/` (following
+  `options`-style arguments) and fails when one is missing `windowsHide: true`. It also asserts the
+  two known console spawns - the Credential Manager read and the CLI quota probe - are covered.
+
 ## [0.8.2] - 2026-10-21
 
 ### Fixed

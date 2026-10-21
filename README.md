@@ -231,6 +231,11 @@ it will be retried. A recent CLI reading is kept for up to 30 minutes during suc
 stops at the last honest number instead of the HTTP summary's rosier Gemini figure — the summary is also
 genuinely different for Gemini (see [Quota](#quota)).
 
+**A terminal window flashes on screen.** Something the plugin spawned opened a console. The host is a
+GUI process, so any console program spawned without `windowsHide: true` gets its own console window for
+as long as it runs. Fixed in 0.8.3 for the Credential Manager read (`lib/import-auth.js`), which runs
+every few minutes; `test/no-window-flash.mjs` now fails if a new spawn site forgets the flag.
+
 **A browser window opens on the Antigravity login page.** It is `agy`, not the plugin: the CLI refreshes
 its expired Credential Manager token at start-up and, when that refresh fails, would start an interactive
 OAuth flow. Since 0.8.2 the probe runs with `AGY_CLI_NONINTERACTIVE_HEADLESS=1`, so the CLI prints
