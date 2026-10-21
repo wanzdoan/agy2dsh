@@ -1,8 +1,9 @@
-# dsh-subscriptions bundle layer.
+# agy2dsh bundle layer.
 #
-# `name` must stay the full npm package name: the client-modules registry
-# resolves the browser bundle by the loader entry name.
+# `name` must stay the full package name: the client-modules registry resolves
+# the browser bundle by the loader entry name, and it must match
+# `export const name` in lib/index.js.
 - insert:
-    - id: dsh-subscriptions
-      name: '@goodandready/dsh-subscriptions'
+    - id: agy2dsh
+      name: 'agy2dsh'
       config: {}

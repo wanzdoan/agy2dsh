@@ -1,7 +1,7 @@
 {
-  "name": "@goodandready/dsh-subscriptions",
-  "version": "0.7.3",
-  "description": "Use your Antigravity (Google Gemini and Claude models) and ChatGPT Codex consumer subscriptions as DeepSeek Harness LLM providers, with self-refreshing OAuth, account rotation and bilingual UI.",
+  "name": "agy2dsh",
+  "version": "0.8.0",
+  "description": "Use your Antigravity (Gemini) and ChatGPT Codex consumer subscriptions as DeepSeek Harness LLM providers: self-refreshing OAuth, accurate quota pill, account rotation, bilingual settings.",
   "license": "MIT",
   "type": "module",
   "main": "./lib/index.js",
@@ -21,18 +21,20 @@
     "dsh",
     "dsh-plugin",
     "deepseek-harness",
-    "oauth",
+    "antigravity",
+    "agy",
+    "gemini",
+    "codex",
     "chatgpt",
-    "claude",
-    "grok"
+    "oauth"
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GooDAnDReaDY/dsh-subscriptions.git"
+    "url": "git+https://github.com/wanzdoan/agy2dsh.git"
   },
-  "homepage": "https://github.com/GooDAnDReaDY/dsh-subscriptions",
+  "homepage": "https://github.com/wanzdoan/agy2dsh#readme",
   "bugs": {
-    "url": "https://github.com/GooDAnDReaDY/dsh-subscriptions/issues"
+    "url": "https://github.com/wanzdoan/agy2dsh/issues"
   },
   "scripts": {
     "test": "eslint lib/ test/ && node --import ./test/_setup.mjs --test test/*.test.mjs",
@@ -77,4 +79,3 @@
     "typescript": "^7.0.2"
   }
 }
-

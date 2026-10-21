@@ -1,3 +1,52 @@
+## [0.8.0] - 2026-10-21
+
+### Changed
+- **Renamed to `agy2dsh`.** The package, the loader entry, the browser bundle id and the
+  repository are now `agy2dsh`, which names what the plugin actually does: Antigravity
+  (`agy`) plus Codex, into DeepSeek Harness. The settings namespace stays `dsh-subscriptions`
+  and HTTP routes stay under `/dsh-subscriptions/...` on purpose, so an existing install keeps
+  its accounts, slots and preferences across the rename.
+- Only two providers remain: `antigravity` (Gemini and Claude models) and `codex`.
+
+### Fixed
+- **Secrets are saveable again.** `antigravityClientSecret`, `masterKey`,
+  `vaultSyncPassphrase`, `vaultSyncWebdavPassword`, `vaultSyncGistToken` and
+  `vaultSyncS3SecretKey` were the only fields left out of the volatile set, so saving the
+  settings form failed with `Could not save: Config field "antigravityClientSecret" is not
+  volatile`. Every field is now volatile; the form still round-trips them masked (`••••••`)
+  and `restoreMaskedSecrets` puts the real value back before the write.
+- `verify-volatility.mjs` asserts that all 59 config fields are volatile, so this class of bug
+  cannot come back silently.
+
+## [0.7.4] - 2026-10-21
+
+### Analysis
+Reverse engineered `agy.exe` to answer one question: how does `/usage` obtain its numbers, and
+can the plugin read them without the CLI? Full write-up in `notes/agy-usage-re.md`.
+
+- The binary is Go and embeds the Cloud Code protos. `RetrieveUserQuotaSummary` belongs to
+  `PredictionService` (`/google.internal.cloud.code.v1internal.PredictionService/…`), takes
+  `RetrieveUserQuotaSummaryRequest { string project }`, and answers with
+  `groups[].buckets[] { bucket_id, display_name, description, window, remaining_fraction,
+  remaining_amount, disabled, reset_time }`. `remaining_fraction` is what is **left**.
+- Measured in the same minute with the same token, Claude matches on every path and **Gemini
+  never does**: the CLI says `gemini-weekly 0.9481` (reset in 4d19h), while gRPC and REST, with
+  and without `project: "aicode-consumers"`, on both the prod and daily hosts, all answer `1.0`
+  with a reset that slides forward with the clock. `retrieveUserQuota` per-model also reports
+  `1.0` for every Gemini model.
+- The CLI's figures move while the account is idle and keep a reset anchored in the past, so
+  they are served from the CLI's own ledger (`exa.language_server_pb.LanguageServerService`
+  exposes its own `RetrieveUserQuotaSummary`), not from a fresh cloud read.
+
+### Changed
+- **Quota origin is recorded.** Snapshots carry `source: 'cli' | 'api'`, persisted next to the
+  windows and surfaced as `active.usageSource` in `/dsh-subscriptions/status`, so a wrong
+  reading can be traced instead of guessed at.
+- **The HTTP fallback now sends the `project`** from the account's Code Assist project with
+  `retrieveUserQuotaSummary` / `retrieveUserQuota`, which is what the request message is for.
+- `notes/agy-usage-re.md` plus `grpcprobe.mjs`, `scanservices.mjs` and `scanstrings.mjs` keep
+  the investigation reproducible.
+
 ## [0.7.3] - 2026-10-21
 
 ### Changed
@@ -798,7 +847,7 @@ A remake rather than a patch: the plugin now supports the two subscriptions that
 ### Fixed
 - **Peer gate on DSH 0.2.0-rc.1** (#58): DSH skips a profile bundle whose `peerDependencies` exclude the running version, so this plugin was absent from the profile with no error in the UI. Every `@deepseek-ai/dsh-*` peer now names both the 0.1.7-rc.2 and 0.2.0-rc.1 lines, because semver does not admit a prerelease of the next minor into a range that does not name it.
 
-Notable changes to `@goodandready/dsh-subscriptions`.
+Notable changes to `agy2dsh`.
 
 ## 0.6.33
 
@@ -833,7 +882,7 @@ Notable changes to `@goodandready/dsh-subscriptions`.
 - **Theme Variables in CSS (#406)**: replaced hardcoded hex fallback `#3b82f6` in `.dsub-speed-tag` styles with pure theme variable `var(--dsw-alias-brand-default)`.
 - **Runtime Quota Alerts & Session Expiration Wiring (#407)**: wired `checkQuotaThresholds` into adapter quota capture and `notifySessionExpired` into `streamWithRotation` on 401/`TOKEN_REVOKED` errors; dynamically resolved User-Agent from `package.json` in external webhook dispatcher.
 - **Snapshot Status in Settings PluginCard (#408)**: added handling of host configuration status in `PluginCard` (`props.status === loading` and `props.status === unavailable`) to comply with DSH slot contracts.
-- **Canonical Plugin Updater Aliases & Fail-Closed Validation (#409)**: registered canonical route aliases `/api/@goodandready/dsh-subscriptions/update` and `/api/dsh-subscriptions/update`; enforced strict fail-closed origin validation using `isTrustedSettingsRequest`.
+- **Canonical Plugin Updater Aliases & Fail-Closed Validation (#409)**: registered canonical route aliases `/api/agy2dsh/update` and `/api/dsh-subscriptions/update`; enforced strict fail-closed origin validation using `isTrustedSettingsRequest`.
 
 ## 0.6.28
 
@@ -973,7 +1022,7 @@ Notable changes to `@goodandready/dsh-subscriptions`.
   slot the current DSH core (0.1.6-alpha.2) no longer renders, so the plugin's
   settings were unreachable. The surface now registers into the Plugins page row
   seat `plugins.row.config`, keyed
-  `@goodandready/dsh-subscriptions#dsh-subscriptions`
+  `agy2dsh#dsh-subscriptions`
   (`rowConfigKey(package, rowId)`): the plugin's row gains a configure control whose
   page is the settings form (`view: 'page'`, open and without our card chrome — the
   host page draws the title, icon, crumb and padding) plus a one-line state for

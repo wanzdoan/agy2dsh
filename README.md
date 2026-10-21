@@ -20,7 +20,7 @@ images are forwarded as inline image blocks.
 ## Install
 
 ```
-dsh plugin install @goodandready/dsh-subscriptions
+dsh plugin install agy2dsh
 ```
 
 Then restart DeepSeek Harness so the host plugin is loaded.
@@ -69,10 +69,14 @@ Antigravity's quota is metered per model family and per window, so the plugin re
 time. A single blended percentage cannot describe the account.
 
 The numbers come from the CLI itself (`agy --print "/usage" --output-format json`) whenever
-`agy` is logged into the same account, because the HTTP quota summary describes a different
-Gemini bucket than the one the CLI shows (verified at the same second: summary 100% left with
-a reset 7 days out, CLI 93.96% left resetting in 4d19h). Without the CLI the plugin falls back
-to `:retrieveUserQuotaSummary`. Set `DSH_SUBSCRIPTIONS_QUOTA_SOURCE=api` to always use HTTP.
+`agy` is logged into the same account, because no cloud quota call reproduces them: measured in
+the same minute with the same token, `PredictionService.RetrieveUserQuotaSummary` (gRPC and REST,
+prod and daily, with and without `project`) reports `gemini-weekly 1.0` resetting a week out while
+the CLI reports `0.9481` resetting in 4d19h. Claude agrees on every path; Gemini does not.
+Without the CLI the plugin falls back to `:retrieveUserQuotaSummary` with the account's project.
+`/dsh-subscriptions/status` reports which one answered as `active.usageSource` (`cli` / `api`),
+and `DSH_SUBSCRIPTIONS_QUOTA_SOURCE=api` always uses HTTP. The full analysis, including the
+protobuf contract, is in `docs-agy-usage-re.md`.
 
 ## Importing accounts
 
