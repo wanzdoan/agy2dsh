@@ -1,3 +1,52 @@
+## [0.7.2] - 2026-10-21
+
+### Fixed
+- **The quota disagreed with `agy /usage`.** Measured at the same second, the
+  `:retrieveUserQuotaSummary` endpoint and the CLI reported *different Gemini
+  buckets*: the summary said 100% left with a reset seven days out, the CLI said
+  93.96% left resetting in 4d19h, while both agreed on Claude. The plugin now reads
+  the number the user actually sees: it runs `agy --print "/usage" --output-format
+  json`, parses `command.data.groups`, and only uses that path when `agy` is logged
+  into the same account being displayed (the CLI reports whoever is logged in, not
+  an arbitrary stored token). Any failure falls back to the HTTP summary, and
+  `DSH_SUBSCRIPTIONS_QUOTA_SOURCE=api` disables the CLI path entirely.
+  Verified live: `gemini-weekly 93.96%`, `gemini-5h 91.01%`, `3p-weekly 0.26%`,
+  `3p-5h 100%` — identical to the CLI output.
+- **The pill printed raw window ids and a used-percentage.** It rendered
+  `gemini-weekly 0%` because `/status` rebuilt each window as
+  `{id,label,usedPercent,resetAt}` and dropped `family`/`window`, and because the
+  numbers were *used* while the CLI reports what is *left*. The status route now
+  forwards `family`, `window` and `remainingPercent`, the client recovers both
+  fields from the id when they are missing, and the label is
+  `Gemini [94%|91%] | Claude [0.3%|100%]` — weekly first, 5-hour second.
+- **The hub closed itself.** `HubPill` re-renders on every poll and passed a fresh
+  `onClose` closure each time, so the dialog's setup effect re-ran its cleanup
+  (`el.close()`) and dismissed the panel. The effect now has no dependencies and
+  reads the close callback through a ref.
+- **Opening the hub nudged the chat.** Besides living inside the header slot, the
+  dialog received focus on open, which scrolled the conversation container. It is
+  now rendered through a portal into `<body>` (when `react-dom` is available, with
+  a plain `<dialog>` fallback) and focused with `preventScroll: true`.
+- **Empty providers showed as "account 1".** Config carries one placeholder slot
+  per provider; the panel listed them as accounts. Only `configured` slots are
+  listed now, and a provider without accounts shows its empty state.
+- **Quota data went stale.** Nothing refreshed the snapshot after startup, so the
+  pill could show numbers from hours earlier. A two-minute loop calls
+  `refreshUsage()` for each configured provider; the store's own TTL keeps that
+  from turning into a busy loop.
+- **Hub rows show the exact figures** the CLI prints (`93.96%`, `0.26%`) instead of
+  rounding to whole percentages.
+
+### Verification
+- `verify-render.mjs` (rewritten): 33/33 — a miniature React runtime renders the
+  real slot components against a captured `/config` + `/status` payload and asserts
+  the pill text, that no raw window id leaks, that the dialog opens, survives a
+  polling re-render, keeps its state across provider tabs, and lists no placeholder
+  account.
+- `verify-cli-quota.mjs` (new): all four windows from `agy` match the pill.
+- `verify-client.mjs` 14/14, `verify-subscriptions.mjs` 17/17,
+  `verify-quota-summary.mjs` 17/17, `verify-prune.mjs` 73/73.
+
 ## [0.7.1] - 2026-10-21
 
 ### Fixed

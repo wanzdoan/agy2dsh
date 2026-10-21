@@ -44,7 +44,8 @@ indefinitely without running `agy`.
 ## Interface
 
 - **Session header pill** — status dot, provider, one quota readout per model family
-  (`Gemini … Claude …`) and the nearest reset countdown. Click it to open the Hub.
+  (`Gemini [94%|91%] | Claude [0%|100%]`, weekly then 5-hour) and the nearest reset
+  countdown. Click it to open the Hub.
 - **Subscription Hub** — accounts, live quota bars, verify / sync models / remove, import actions.
 - **Composer quota** — optional inline usage next to the message composer.
 - **Language** — `language` setting, `en` (default) or `vi`; the panel and the pill both follow it.
@@ -63,10 +64,15 @@ indefinitely without running `agy`.
 | `composerQuota` | `off` | `off` / `percent` / `bar` |
 | `notifyLimits` | `true` | Alert when a quota window passes 90% |
 
-Antigravity's quota is metered per model family and per window, so the plugin reads
-`:retrieveUserQuotaSummary` and reports **four** numbers — `Gemini [weekly|5h]` and
-`Claude [weekly|5h]` — each with its own reset time. A single blended percentage cannot
-describe the account.
+Antigravity's quota is metered per model family and per window, so the plugin reports
+**four** numbers — `Gemini [weekly|5h]` and `Claude [weekly|5h]` — each with its own reset
+time. A single blended percentage cannot describe the account.
+
+The numbers come from the CLI itself (`agy --print "/usage" --output-format json`) whenever
+`agy` is logged into the same account, because the HTTP quota summary describes a different
+Gemini bucket than the one the CLI shows (verified at the same second: summary 100% left with
+a reset 7 days out, CLI 93.96% left resetting in 4d19h). Without the CLI the plugin falls back
+to `:retrieveUserQuotaSummary`. Set `DSH_SUBSCRIPTIONS_QUOTA_SOURCE=api` to always use HTTP.
 
 ## Importing accounts
 
