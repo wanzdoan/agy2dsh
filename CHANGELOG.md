@@ -1,3 +1,48 @@
+## [0.9.0] - 2026-10-21
+
+### Added
+- **`generate_image`: real text-to-image on the subscription, so the agent stops drawing with PIL.** Asking
+  Antigravity for a picture used to produce Python code, because image generation was not a capability the
+  adapter could reach: the vendor CLI hides it behind a built-in `image-generator` subagent
+  (`third_party/jetski/cortex/customizations/builtin/agents/image_generator.go`, behind the
+  `enable-image-generator-subagent` flag), and an LLM adapter only ever speaks `generateContent`. The backend
+  is reachable with the same token, though - it publishes `imageGenerationModelIds` in
+  `FetchAvailableModels` and serves that model through `:generateContent` with
+  `responseModalities: ["TEXT","IMAGE"]`, so the plugin now registers a real tool:
+
+  ```jsonc
+  // what the model calls
+  { "prompt": "a single ripe red apple on a white seamless background, studio product photo",
+    "aspect_ratio": "1:1" }
+  ```
+
+  The tool returns a text envelope plus an `ImageBlock`, so the picture renders in the conversation and the
+  agent can look at it on the next step (the same mechanism `read_image` uses), and it writes the file to
+  `<DSH home>/artifacts/agy2dsh/images` (or `imageOutputDir`). Verified live: 1024x1024 in 17 s for `1:1`,
+  1376x768 for `16:9`, 426 KB JPEG, ~1.5k tokens.
+- The model id is never hardcoded: it comes from `imageGenerationModelIds` (cached 10 minutes per account,
+  `imageModelId` overrides). Two measured quirks are handled: the id is absent from the chat `models` catalog,
+  and the production host answered `429 RESOURCE_EXHAUSTED` for it while the daily host served the same
+  request - so the daily host is tried first, the working host is remembered, and a 401/403 stops the retry
+  because that token is bad everywhere.
+- `aspect_ratio` is passed as `generationConfig.imageConfig.aspectRatio`, confirmed honoured by the backend;
+  an unknown ratio is dropped rather than sent.
+- `/dsh-subscriptions/status` reports `image: { enabled, model }`, and the settings panel shows the detected
+  model next to a new **Image generation** toggle (`imageGeneration`).
+- New limits: `imageGeneration` (true), `imageModelId` (''), `imageOutputDir` (''), `imageTimeoutMs` (120000).
+- `test/image-gen.mjs` (51 checks: model discovery, envelope, response parsing, media sniffing, JPEG/PNG/WebP/GIF
+  dimensions, host fallback, limits), `test/tool-shape.mjs` (31 checks, run against the host's own
+  `assertObjectJsonSchema` / `assertSupportedJsonSchema` / `validateJsonSchemaValue`), and
+  `test/image-live.mjs` (generates two real images and runs the tool path end to end).
+
+### Notes
+- The tool object is built by hand against the registry contract (`parameters` as JSON Schema,
+  `output { schema, render, presentationMeta }`) instead of importing `@deepseek-ai/dsh-tools`: the plugin is
+  installed under the profile, where that package is not a resolvable bare specifier. `test/tool-shape.mjs`
+  proves the hand-built shape passes the host's validators.
+- Image requests bill against the subscription's Gemini quota (the same pool as chat), not a separate Imagen
+  API key.
+
 ## [0.8.3] - 2026-10-21
 
 ### Fixed

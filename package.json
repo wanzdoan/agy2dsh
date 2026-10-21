@@ -1,7 +1,7 @@
 {
   "name": "agy2dsh",
-  "version": "0.8.3",
-  "description": "Use your Antigravity (Gemini) and ChatGPT Codex consumer subscriptions as DeepSeek Harness LLM providers: self-refreshing OAuth, accurate quota pill, account rotation, bilingual settings.",
+  "version": "0.9.0",
+  "description": "Use your Antigravity (Gemini) and ChatGPT Codex consumer subscriptions as DeepSeek Harness LLM providers: self-refreshing OAuth, accurate quota pill, account rotation, text-to-image through the subscription, bilingual settings.",
   "license": "MIT",
   "type": "module",
   "main": "./lib/index.js",
@@ -39,8 +39,8 @@
     "url": "https://github.com/wanzdoan/agy2dsh/issues"
   },
   "scripts": {
-    "test": "node test/imports.mjs && node test/config-volatility.mjs && node test/rotation-strategies.mjs && node test/quota-summary.mjs && node test/cli-guard.mjs && node test/no-window-flash.mjs",
-    "test:live": "node test/cli-quota.mjs"
+    "test": "node test/imports.mjs && node test/config-volatility.mjs && node test/rotation-strategies.mjs && node test/quota-summary.mjs && node test/cli-guard.mjs && node test/no-window-flash.mjs && node test/image-gen.mjs && node test/tool-shape.mjs",
+    "test:live": "node test/cli-quota.mjs && node test/image-live.mjs"
   },
   "dsh": {
     "bundle": {

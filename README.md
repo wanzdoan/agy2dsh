@@ -25,9 +25,10 @@ accounts, slots and preferences across the rename.
   with per-window bars and reset countdowns, an optional composer quota; Antigravity numbers come
   from `agy` when the CLI is logged into the same account and from the Cloud Code HTTP summary
   otherwise, Codex numbers from the ChatGPT usage endpoint.
-- **Images, reset credits, operations.** Attachments become inline image blocks, Codex accounts can
-  serve the host's image generation service (`subscriptionImages`), Codex reset credits can be
-  consumed behind a confirmation step, and the plugin keeps request history, diagnostics, a
+- **Images, reset credits, operations.** `generate_image` draws pictures with the subscription's Google
+  image model and shows them in the conversation (see [Image generation](#image-generation)), Codex
+  accounts can serve the host's image generation service (`subscriptionImages`), Codex reset credits can
+  be consumed behind a confirmation step, and the plugin keeps request history, diagnostics, a
   localhost-only dashboard and an optional encrypted vault (WebDAV/Gist/S3).
 
 ## Requirements
@@ -128,6 +129,34 @@ how the last probe went as `cliQuota` (`ok`, `reason`, `backoff`, `cachedAt`);
 `DSH_SUBSCRIPTIONS_QUOTA_SOURCE=api` forces the HTTP path. Usage refreshes at most every two minutes into
 the credential blob, so the Hub keeps the last known windows across a restart.
 
+## Image generation
+
+Antigravity ships a Google image model with the subscription, but only the vendor's own agent can use it: the
+CLI hands image requests to a built-in `image-generator` subagent, so an LLM adapter that only speaks
+`generateContent` never sees it and a model asked for a picture writes PIL code instead. The plugin closes
+that gap with a real tool:
+
+```
+prompt: "a single ripe red apple on a white seamless background, studio product photo"
+aspect_ratio: "1:1"        # 1:1, 2:3, 3:2, 3:4, 4:3, 9:16, 16:9
+```
+
+The tool resolves the image model id from `imageGenerationModelIds` in `FetchAvailableModels` (never
+hardcoded, cached ten minutes, `imageModelId` overrides), POSTs `:generateContent` with
+`responseModalities: ["TEXT","IMAGE"]`, saves the file to `<DSH home>/artifacts/agy2dsh/images` (`imageOutputDir`
+moves it) and returns a text envelope plus an `ImageBlock` — the picture appears in the conversation and the
+agent can inspect it on the next step, exactly like the host's own `read_image`.
+
+Two quirks measured against a live account are handled: the image model id is not in the chat `models` catalog
+(it only appears in `imageGenerationModelIds`), and the production host answered `429 RESOURCE_EXHAUSTED` for it
+while the daily host served the same request — so the daily host is tried first, the host that worked is
+remembered for ten minutes, and a 401/403 stops the retry because that token is rejected everywhere. Requests
+bill against the subscription's Gemini quota (the same pool as chat); a 1024x1024 image cost about 1.5k tokens.
+Details in [`docs/image-generation.md`](docs/image-generation.md).
+
+`imageGeneration` (`true`) turns the tool off, and `/dsh-subscriptions/status` reports the detected model as
+`image.model` — the settings panel shows it too, which is the quickest way to confirm the capability is live.
+
 ## Configuration
 
 Everything lives in the `dsh-subscriptions` settings namespace and is editable from the Settings panel
@@ -140,6 +169,10 @@ accepts any write; secrets round-trip masked as `••••••` and are res
 | `privacyMask` | `false` | Masks account emails and labels in the UI. |
 | `composerQuota` | `off` | `off`, `percent` or `bar` quota next to the composer. |
 | `usageTimeoutMs` | `15000` | Upper bound for one quota request, including the `agy` CLI probe. |
+| `imageGeneration` | `true` | Expose the `generate_image` tool. |
+| `imageModelId` | `''` | Image model override; empty uses the id the backend publishes per account. |
+| `imageOutputDir` | `''` | Where generated images are saved; empty uses `<DSH home>/artifacts/agy2dsh/images`. |
+| `imageTimeoutMs` | `120000` | Timeout for one image request. |
 | `cliQuotaTtlMs` | `300000` | Reuse an `agy` quota reading this long before probing again; `0` probes every refresh. |
 | `cliQuotaBackoffMs` | `300000` | After a failed `agy` probe, wait this long before retrying (a login prompt waits 15 minutes). |
 | `cliQuotaTimeoutMs` | `20000` | Hard timeout for one `agy` probe; the process is killed at this point. |
@@ -235,6 +268,12 @@ genuinely different for Gemini (see [Quota](#quota)).
 GUI process, so any console program spawned without `windowsHide: true` gets its own console window for
 as long as it runs. Fixed in 0.8.3 for the Credential Manager read (`lib/import-auth.js`), which runs
 every few minutes; `test/no-window-flash.mjs` now fails if a new spawn site forgets the flag.
+
+**A picture request turns into Python instead of an image.** Check `image` in `GET /dsh-subscriptions/status`.
+No `model` means the tool is off (`imageGeneration`), no Antigravity account is signed in, or the catalog could
+not be read (the tool then falls back to `gemini-3.1-flash-image`). If the model is listed and the agent still
+writes PIL code, it was told to: say "use the generate_image tool" once, or check that a different plugin is
+not masking the tool. There is no Imagen API key involved — the subscription token is enough.
 
 **A browser window opens on the Antigravity login page.** It is `agy`, not the plugin: the CLI refreshes
 its expired Credential Manager token at start-up and, when that refresh fails, would start an interactive
