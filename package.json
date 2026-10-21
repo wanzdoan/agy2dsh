@@ -1,6 +1,6 @@
 {
   "name": "@goodandready/dsh-subscriptions",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "Use your Antigravity (Google Gemini and Claude models) and ChatGPT Codex consumer subscriptions as DeepSeek Harness LLM providers, with self-refreshing OAuth, account rotation and bilingual UI.",
   "license": "MIT",
   "type": "module",

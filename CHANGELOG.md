@@ -1,3 +1,29 @@
+## [0.7.3] - 2026-10-21
+
+### Changed
+- **The pill is quieter.** The reset countdown is gone from the header; it now
+  lives only in the account card inside the Hub, where there is room to read it.
+  The pill is just provider, both families and their allowances.
+- **The status dot tracks the Gemini 5-hour window**: green with 60% or more left,
+  amber below 60%, red below 20%. Accounts without a Gemini window fall back to
+  their first family so the dot never lies about an empty state.
+- **Brand marks.** A four-point spark before `Gemini` and a sunburst before
+  `Claude`, inline SVG following the theme (Gemini `#4C8DF6`, Claude `#D97757`),
+  in the pill and on each Hub quota row.
+
+### Fixed
+- **`Could not save: Config field "language" is not volatile`.** `language` was
+  the one user-editable field declared without `.volatile()`, and the settings
+  service refuses to write any path it does not consider volatile. It is volatile
+  now, like every other field the panel edits, so switching to Tiếng Việt saves.
+
+### Verification
+- `verify-render.mjs` 36/36 at three quota levels (91%, 50%, 15% left): pill text,
+  absence of the countdown, two brand marks, dot tone green/amber/red, and the
+  countdown still present in the account card.
+- `verify-client.mjs` 14/14, `verify-subscriptions.mjs` 17/17,
+  `verify-quota-summary.mjs` 17/17, `verify-cli-quota.mjs` pass.
+
 ## [0.7.2] - 2026-10-21
 
 ### Fixed
