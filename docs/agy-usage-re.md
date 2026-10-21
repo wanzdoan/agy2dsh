@@ -86,21 +86,62 @@ prints are not reconstructible from any cloud quota call reachable with the user
 
 1. `lib/agy-usage.js` runs `agy --print "/usage" --output-format json` and parses
    `command.data.groups[].buckets[]` — the exact numbers the user sees. It is only used when
-   `agy` is logged into the same account being displayed, cached for 60 s, capped at 25 s, and
-   never allowed to throw.
+   `agy` is logged into the same account being displayed, cached for five minutes
+   (`cliQuotaTtlMs`), capped at 20 s (`cliQuotaTimeoutMs`), never allowed to throw, and never
+   allowed to become interactive.
 2. `lib/accounts.js` prefers that snapshot for antigravity and tags it `source: 'cli'`;
    everything else falls through to the HTTP summary, tagged `source: 'api'`. The tag is
-   persisted with the snapshot and exposed as `active.usageSource` in `/dsh-subscriptions/status`.
+   persisted with the snapshot and exposed as `active.usageSource` in `/dsh-subscriptions/status`,
+   together with `cliQuota` (last probe outcome and backoff).
 3. The HTTP fallback now sends `RetrieveUserQuotaSummaryRequest { project }` with the account's
    Code Assist project, matching the proto, so a managed account stays on its own pool.
 4. `DSH_SUBSCRIPTIONS_QUOTA_SOURCE=api` forces the HTTP path when the CLI is unwanted.
+
+## Authentication, and why the probe must be headless
+
+The CLI keeps its OAuth token in Windows Credential Manager (`gemini:antigravity`, payload
+`{ token: { access_token, token_type, refresh_token, expiry, expires_in }, auth_method, id_token }`)
+and authenticates in print mode through `ChainedAuth -> keyringAuth`. Two measured facts shape the
+probe:
+
+1. **The stored record is always stale.** The CLI rewrites it on every run with its own expired
+   copy, so `keyringAuth` logs `expired=true` and refreshes over the network at start-up. Writing a
+   fresh token into that record from outside was tried (`CredWrite` with the same
+   `CREDENTIAL` layout: `uint` sizes, `FILETIME` LastWritten) and verified — the CLI replaced it
+   with the expired copy within three minutes. There is no setting to stop it.
+2. **A failed start-up refresh turns interactive.** `printmode.go`:
+
+   ```
+   Print mode: not authenticated, trying silent auth
+   keyringAuth: loaded token, expiry=... expired=true
+   token refresh failed due to network error: ... 127.0.0.1:9 ...
+   Print mode: silent auth failed
+   Print mode: triggering interactive OAuth      -> opens accounts.google.com in a browser, blocks
+   ```
+
+   A refused proxy port and a 10-second keyring timeout each triggered it while the plugin was
+   refreshing quota in the background.
+
+`AGY_CLI_NONINTERACTIVE_HEADLESS=1` is the switch that keeps this headless: the same failure then
+prints `Authentication required. Please visit the URL to log in: https://accounts.google.com/...` on
+stderr and exits immediately. Google does not rotate the refresh token for this client (the refresh
+response carries no `refresh_token`), so the plugin's own refresh and the CLI's do not invalidate
+each other.
 
 ## Re-verifying
 
 ```bash
 node test/cli-quota.mjs        # CLI snapshot vs raw payload, prints the pill
+node test/cli-guard.mjs        # headless flag, login-prompt detection, cache and backoff
 node tools/grpcprobe.mjs cloudcode-pa.googleapis.com PredictionService RetrieveUserQuotaSummary
 node tools/grpcprobe.mjs daily-cloudcode-pa.googleapis.com PredictionService RetrieveUserQuotaSummary
+```
+
+To reproduce the login-prompt path by hand, force the refresh to fail and watch the CLI log:
+
+```powershell
+$env:HTTPS_PROXY='http://127.0.0.1:9'; $env:AGY_CLI_NONINTERACTIVE_HEADLESS='1'
+agy --print "/usage" --output-format json   # prints the login URL, exits, no browser
 ```
 
 `tools/grpcprobe.mjs` takes `[host] [Service] [Method] [protoHexBody]` and decodes the protobuf reply

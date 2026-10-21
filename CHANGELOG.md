@@ -1,3 +1,53 @@
+## [0.8.2] - 2026-10-21
+
+### Fixed
+- **A background quota refresh can no longer open a browser login page.** After a while, the quota
+  check failed and the Antigravity login page appeared in the default browser. The plugin was not
+  opening it - `agy` was. The probe spawns `agy --print "/usage"`, and when the CLI's stored access
+  token needed a refresh and that refresh was slow or could not reach the network, print mode gave
+  up on silent auth and fell into interactive OAuth. From
+  `~/.gemini/antigravity-cli/log/cli-20261021_1602*.log`:
+
+  ```
+  keyringAuth: loaded token, expiry=2026-10-20 19:13:47 +0700 +07 expired=true
+  token refresh failed due to network error: ... dial tcp 127.0.0.1:9 ...
+  Print mode: silent auth failed
+  Print mode: triggering interactive OAuth      <-- browser tab, then it waits for a human
+  ```
+
+  A refused proxy port and a 10-second keyring timeout were both enough to trigger it
+  (`cli-20261021_1832*.log`). The probe now runs with `AGY_CLI_NONINTERACTIVE_HEADLESS=1`, so the
+  same situation prints `Authentication required. Please visit the URL to log in: ...` on stderr and
+  exits. Verified by forcing the identical failure (stale token + dead proxy): before the change the
+  CLI logged `triggering interactive OAuth` and blocked; after it, it printed the URL and returned in
+  two seconds.
+- A failed probe now backs off instead of retrying every two minutes: five minutes after a generic
+  failure, fifteen after a login prompt. An outage used to mean a retry - and therefore a fresh
+  login attempt - every two minutes.
+- A CLI outage no longer repaints the pill with the HTTP summary's numbers. Measured at the same
+  second, the summary reported 100% left for Gemini where the CLI reported 94.8%, and the pill's
+  colour is driven by that number. The last CLI reading is now kept for up to 30 minutes while the
+  probe is failing (`lib/agy-usage.js: keepCliReading`).
+
+### Changed
+- The CLI reading is cached for five minutes (`cliQuotaTtlMs`) instead of one. Every probe spawns the
+  whole CLI plus its language server and writes a log file; 108 of them accumulated in a single day.
+- New limits: `cliQuotaTtlMs` (300000), `cliQuotaBackoffMs` (300000), `cliQuotaTimeoutMs` (20000).
+- `/dsh-subscriptions/status` reports `cliQuota` (`ok`, `reason`, `backoff`, `cachedAt`) so a reading
+  that fell back to the HTTP summary can be explained instead of looking like a wrong number.
+- `test/cli-guard.mjs` locks all of this down: the headless flag, login-prompt detection, the five
+  minute cache, the backoff, `force` bypassing both, and the grace rule. 32 checks.
+
+### Notes
+- The CLI rewrites its Credential Manager record with its own stale copy on every run, so keeping
+  that record fresh from the plugin is not a fix. Tried it: the refreshed token written at 18:51 was
+  replaced by the expired copy within three minutes, with no CLI configuration to prevent it. The
+  probe therefore treats the CLI as a source that may need a network refresh every time, and is
+  built to fail safely rather than to keep it permanently signed in.
+- Google does not rotate the refresh token for this client (the refresh response carries no
+  `refresh_token`), which is why the plugin and the CLI can share one without invalidating each
+  other.
+
 ## [0.8.1] - 2026-10-21
 
 ### Fixed

@@ -103,19 +103,28 @@ window of the active account in `percent` or `bar` mode.
 
 The CLI is the preferred source: `lib/agy-usage.js` runs `agy --print "/usage" --output-format json` and
 parses `command.data.groups[].buckets[]` (`remaining_fraction`, `reset_time`), but only when the binary
-exists **and** the CLI is logged into the account being displayed — one process at a time, 60-second cache,
-25-second timeout, never throwing. Those snapshots are tagged `cli`. Otherwise the plugin calls
-`:retrieveUserQuotaSummary` with the account's Code Assist project, then `:retrieveUserQuota` when the
-summary lacks the four windows, and tags the result `api`. Codex uses
-`GET https://chatgpt.com/backend-api/wham/usage`, reduced to its named windows (`primary_window` /
-`secondary_window`, shown as 5h and 7d).
+exists **and** the CLI is logged into the account being displayed — one process at a time, five-minute cache
+(`cliQuotaTtlMs`), 20-second timeout (`cliQuotaTimeoutMs`), never throwing, and never interactive. Those
+snapshots are tagged `cli`. Otherwise the plugin calls `:retrieveUserQuotaSummary` with the account's Code
+Assist project, then `:retrieveUserQuota` when the summary lacks the four windows, and tags the result
+`api`. Codex uses `GET https://chatgpt.com/backend-api/wham/usage`, reduced to its named windows
+(`primary_window` / `secondary_window`, shown as 5h and 7d).
+
+The probe is deliberately non-interactive. `agy` keeps its token in Windows Credential Manager and rewrites
+that record with its own expired copy on every run, so it refreshes over the network at start-up; if that
+refresh is slow or blocked, print mode would fall back to an interactive OAuth flow and open a browser login
+page. Running it with `AGY_CLI_NONINTERACTIVE_HEADLESS=1` turns that case into a printed URL and an exit, and
+a failed probe backs off (5 minutes, 15 after a login prompt) instead of retrying every two minutes.
 
 The CLI wins because no cloud call reproduces its Gemini figure: in the same minute and with the same token,
 `:retrieveUserQuotaSummary` (gRPC and REST, production and daily, with and without `project`) answered `1.0`
 with a reset that slides forward with the clock, while `agy /usage` reported `0.9481` with a pinned reset.
-Claude matches on every path — details in [`docs/agy-usage-re.md`](docs/agy-usage-re.md).
+Claude matches on every path — details in [`docs/agy-usage-re.md`](docs/agy-usage-re.md). Because the summary
+is not a safe stand-in, a CLI reading is kept for up to 30 minutes while the probe is failing rather than
+being replaced by a rosier number from the HTTP path.
 
-`GET /dsh-subscriptions/status` reports which source answered as `active.usageSource` (`cli` or `api`);
+`GET /dsh-subscriptions/status` reports which source answered as `active.usageSource` (`cli` or `api`) and
+how the last probe went as `cliQuota` (`ok`, `reason`, `backoff`, `cachedAt`);
 `DSH_SUBSCRIPTIONS_QUOTA_SOURCE=api` forces the HTTP path. Usage refreshes at most every two minutes into
 the credential blob, so the Hub keeps the last known windows across a restart.
 
@@ -131,6 +140,9 @@ accepts any write; secrets round-trip masked as `••••••` and are res
 | `privacyMask` | `false` | Masks account emails and labels in the UI. |
 | `composerQuota` | `off` | `off`, `percent` or `bar` quota next to the composer. |
 | `usageTimeoutMs` | `15000` | Upper bound for one quota request, including the `agy` CLI probe. |
+| `cliQuotaTtlMs` | `300000` | Reuse an `agy` quota reading this long before probing again; `0` probes every refresh. |
+| `cliQuotaBackoffMs` | `300000` | After a failed `agy` probe, wait this long before retrying (a login prompt waits 15 minutes). |
+| `cliQuotaTimeoutMs` | `20000` | Hard timeout for one `agy` probe; the process is killed at this point. |
 | `streamIdleTimeoutMs` | `180000` | Abort a stream silent for this long; `0` disables. Timeouts never mark an account rate-limited. |
 | `useWebCallback` | `false` | Use the DSH Web origin + `/dsh-subscriptions/oauth/callback` as `redirect_uri`. |
 | `autoLoopback` | `true` | Catch the OAuth callback on the vendor's loopback port (Codex 1455, Antigravity 8085). |
@@ -210,10 +222,21 @@ connected*, confirm `agy2dsh` is still in `dsh.profile.bundles` (a profile reins
 `loggedIn` in `GET /dsh-subscriptions/status`. If you enabled `masterKey`, the same key must reach the host,
 or every call fails with an `encrypted at rest` error.
 
-**Quota disagrees with `agy /usage`.** Check `active.usageSource`. `api` means the CLI was not used: the
-binary was not found, `DSH_SUBSCRIPTIONS_QUOTA_SOURCE=api` is set, `agy` is logged into a different account
-than the slot's email, or the subprocess timed out. Snapshots are cached for two minutes, so wait one cycle;
-the HTTP summary is also genuinely different for Gemini (see [Quota](#quota)).
+**Quota disagrees with `agy /usage`.** Check `active.usageSource` and `cliQuota` in
+`GET /dsh-subscriptions/status`. `api` means the CLI was not used: the binary was not found,
+`DSH_SUBSCRIPTIONS_QUOTA_SOURCE=api` is set, `agy` is logged into a different account than the slot's
+email, or the subprocess timed out. `cliQuota.reason` says which: `auth-required` (the CLI could not use
+its stored credential and asked for a login), `timeout`, `unreadable` or `error`, together with the moment
+it will be retried. A recent CLI reading is kept for up to 30 minutes during such an outage, so the pill
+stops at the last honest number instead of the HTTP summary's rosier Gemini figure — the summary is also
+genuinely different for Gemini (see [Quota](#quota)).
+
+**A browser window opens on the Antigravity login page.** It is `agy`, not the plugin: the CLI refreshes
+its expired Credential Manager token at start-up and, when that refresh fails, would start an interactive
+OAuth flow. Since 0.8.2 the probe runs with `AGY_CLI_NONINTERACTIVE_HEADLESS=1`, so the CLI prints
+`Authentication required. Please visit the URL to log in: ...` and exits instead of opening a browser. If
+you still want to fix the underlying state, run `agy` once interactively and sign in; the CLI will keep
+rewriting its record with an expired copy, so the next probe refreshes again over the network.
 
 **A provider is missing from the model picker.** The adapter is registered only for providers with a
 readable credential, so an empty picker usually means `loggedIn` is false. If `loggedIn` is true and the
