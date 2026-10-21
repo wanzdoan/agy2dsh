@@ -1,3 +1,16 @@
+## [0.8.1] - 2026-10-21
+
+### Fixed
+- **Choosing a rotation strategy now does something.** The settings panel writes `least-used` and
+  `sticky`, but `lib/rotate.js` only compared against `least-loaded` and `priority`, so both panel
+  options silently fell through to round robin. `normalizeRotationStrategy()` maps every spelling
+  onto the two real comparators, and `test/rotation-strategies.mjs` proves "least used" now picks
+  the account with more quota left.
+- `usageTimeoutMs` was read by the quota refresh but missing from the schema, so it could never be
+  set; it is a real field now (default `15000`).
+- The `composerQuota` description advertised a `forecast` mode the client never rendered; it now
+  documents the three modes that exist.
+
 ## [0.8.0] - 2026-10-21
 
 ### Changed
