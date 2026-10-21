@@ -1,3 +1,17 @@
+## [0.6.92] - 2026-10-21
+
+### Fixed
+- **Images were unreadable on every subscription route (#01).** DSH's `read_image` resolves the exact route through `llm.resolveModelInfo()` and refuses unless that result declares `image` in `inputModalities`. Live catalogs (antigravity, codex, claude) never published the field, so `read_image` failed with `model "gemini-3.8-flash-high" does not declare image input`. `lib/models-catalog.js` now exports `inferInputModalities(provider, model)` and `lib/adapter.js` applies it to both the catalog rows and the exact resolved route (with a text-only carve-out for `gpt-oss`, embeddings and similar).
+- **Pasted images never reached the model.** DSH history carries durable attachment references, not bytes, and the plugin had no attachment ingress at all. `lib/images.js` now exposes `materializeImageBlocks()`; `SubscriptionAdapter.materializeImages()` reads each reference through the mounted `attachments` service (`readImageRequest`) and inlines base64 before serialization, so Gemini receives `inlineData`, OpenAI-compatible vendors a data URI and Anthropic a base64 source.
+- **A timeout was reported and parked as `RATE_LIMIT · resets in 59m` (#02).** Transport failures (`TimeoutError`, `ECONNRESET`, 5xx, idle-stream aborts) are now classified by `isTransientTransportError()` in `lib/rotate.js` and resolved to the new `TRANSIENT_ERROR` quarantine reason (90 s, self-clearing) with one same-account retry first. Successful requests already cleared quarantine, so the account returns to rotation on its own instead of needing a delete + re-import. A genuine 429 still honours `cooldownMs`.
+- **Long "high" thinking turns were aborted by a 30 s idle cap (#03).** The antigravity stream idle cap is now 180 s and user-tunable via the new `streamIdleTimeoutMs` setting (0 disables it); the SSE total deadline no longer cuts a healthy stream.
+- **Stale antigravity fallback catalog (#04).** The offline fallback list now mirrors what the Antigravity CLI (`agy models`) actually serves (`gemini-3.8-flash-{high,medium,low}`, `claude-sonnet-4-6`, `claude-opus-4-6-thinking`, `gpt-oss-120b-medium`) instead of retired ids that produced upstream 400s.
+
+### Verification
+- Local harness `verify-subscriptions.mjs`: 17/17 pass (modality inference, adapter resolution, transient vs. 429 quarantine, retry behaviour, happy path).
+- `verify-host.mjs`: every changed route is accepted by the shipped `dsh-llm` `normalizeModelInfo()` and reports `inputModalities=["text","image"]`.
+- `verify-images.mjs`: durable attachment → inline base64 → Gemini `inlineData` / OpenAI data URI, with text-only and no-attachment-service paths left untouched.
+
 ## [0.6.91] - 2026-10-20
 
 ### Security
