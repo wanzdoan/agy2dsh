@@ -1,3 +1,26 @@
+## [0.7.0] - 2026-10-21
+
+A remake rather than a patch: the plugin now supports the two subscriptions that actually matter here and drops everything else.
+
+### Changed
+- **Two providers only.** `antigravity` and `codex` survive; 16 vendor modules were deleted along with the Ollama fallback, custom/third-party vendors and the cross-vendor cascade (`lib/vendors/*` −3 005 LOC, `lib/wire.js` −174, `lib/messages.js` −130, `lib/import-auth.js` 494 → 208). `PROVIDERS` is `['codex', 'antigravity']`, and every route, schema field, capability table and diagnostic that named a removed provider is gone.
+- **Antigravity models are limited to the two metered families**: `gemini-3.8-flash-{high,medium,low}` and the Claude models (`claude-sonnet-4-6`, `claude-opus-4-6-thinking`). `gpt-oss-120b-medium` is no longer advertised, and `fetchAvailableModels` filters anything outside those families.
+- **Bilingual UI, English by default.** New `language` setting (`en` | `vi`, persisted, not volatile). The settings panel and the session pill read it from `/status` + `/config`, so switching language re-renders both without a reload. The old `zh` locale is gone.
+- **New interface.** `lib/client.js` was rewritten (3 614 → ~1 180 lines): a quiet session-header pill (status dot, provider, per-family quota, reset countdown) that opens a Subscription Hub modal, a settings card with the same account/quota surfaces plus rotation and advanced groups, and a composer quota readout. Sticker emojis, badge soup and dead per-vendor knobs are gone; every control is keyboard focusable and labelled.
+- **Antigravity quota shows both families.** `retrieveUserQuota` returns one bucket per model id; `antigravityQuotaFamilies()` (`lib/usage.js`) collapses them into `gemini` and `claude` windows (tightest bucket = binding constraint) and `retrieveQuotaPercent()` returns both. Previously `deepestUsedPercent()` took the maximum across buckets, so the Claude family always won and the Gemini allowance was invisible.
+- `usage.js` window labels are `{ en, vi }`; the dead `grokBillingPercent()` export is removed.
+
+### Fixed
+- **Imported Antigravity accounts died after ~1 hour (#05).** The import stored `accessToken` + `refreshToken` + `clientId` but not a client secret, and Google rejects a refresh grant without one: `400 invalid_request: client_secret is missing.` The guard meant to catch this only knew the old Gemini CLI client id, so the request went out secret-less and the account expired with the access token. The CLI's own installed-app client id/secret pair (embedded in `agy`'s binary, not a user credential) is now bundled in `lib/vendors/antigravity.js` (`AGY_CLI_CLIENT_ID`, `bundledClientSecret()`), used automatically for any imported account, and stored on the blob after a successful refresh. Rotated refresh tokens are persisted when Google returns one.
+- Verified live: a real CLI-imported account refreshes through `refresh()` with no configuration and no `agy` invocation (`expires_in=3599`), so the "run the CLI, delete the account, import again" loop is no longer needed.
+
+### Verification
+- `verify-prune.mjs`: 72/72 remaining modules import cleanly; `node --check` 73/73.
+- `verify-client.mjs` (new): 14/14 — bundle boots, `apply()` registers both locales and all 7 slots, `en`/`vi` key sets match (83 keys, no identical strings), no sticker emojis, no removed provider ids.
+- `verify-subscriptions.mjs` 17/17, `verify-host.mjs` all routes accepted, `verify-images.mjs` 4/4.
+- `verify-quota-families.mjs`: a real bucket payload yields `gemini 50%` + `claude 99.74%` with their own reset times.
+- `verify-refresh.mjs`: real refresh against Google succeeds with the bundled client secret.
+
 ## [0.6.92] - 2026-10-21
 
 ### Fixed
