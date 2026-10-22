@@ -1,6 +1,6 @@
 {
   "name": "agy2dsh",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "Use your Antigravity (Gemini) and ChatGPT Codex consumer subscriptions as DeepSeek Harness LLM providers: self-refreshing OAuth, accurate quota pill, account rotation, text-to-image through the subscription, bilingual settings.",
   "license": "MIT",
   "type": "module",
