@@ -3,7 +3,9 @@
 # `name` must stay the full package name: the client-modules registry resolves
 # the browser bundle by the loader entry name, and it must match
 # `export const name` in lib/index.js.
+# `id` must be 'dsh-subscriptions' because the plugin's configuration schema,
+# settings namespace and Web API persist under 'dsh-subscriptions'.
 - insert:
-    - id: agy2dsh
+    - id: dsh-subscriptions
       name: 'agy2dsh'
       config: {}
